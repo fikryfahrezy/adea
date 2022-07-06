@@ -1,13 +1,26 @@
 package main
 
-import "net/http"
+import (
+	"github.com/fikryfahrezy/adea/los/auth"
+	"github.com/fikryfahrezy/adea/los/data"
+	"github.com/fikryfahrezy/adea/los/file"
+	"github.com/fikryfahrezy/adea/los/handler"
+	"github.com/fikryfahrezy/adea/los/loan"
+	"github.com/fikryfahrezy/adea/los/setting"
+)
 
 func main() {
-	mux := http.NewServeMux()
+	dbJson := data.NewJson("")
+	file := file.New()
 
-	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("pong"))
-	})
+	authRepo := auth.NewRepository(dbJson)
+	loanRepo := loan.NewRepository(dbJson)
 
-	http.ListenAndServe(":8080", mux)
+	setting := setting.NewSetting(dbJson)
+	auth := auth.NewApp(authRepo)
+	loan := loan.NewApp(file.Save, loanRepo)
+
+	handler := handler.NewHandler(setting, auth, loan)
+
+	handler.ServeRestAPI()
 }
