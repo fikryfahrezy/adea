@@ -1,0 +1,63 @@
+name: CI/CD for los service
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/**"
+      - "los/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/**"
+      - "los/**"
+
+jobs:
+  ci:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: los
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.18.x
+      - name: Downlaod Go packages
+        run: go mod download
+        env:
+          GOPROXY: "https://proxy.golang.org"
+      - name: Test Go codes
+        run: go test ./...
+        env:
+          GOPROXY: "https://proxy.golang.org"
+
+  cd:
+    name: Deploy to Nomad
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install nomad
+        run: |
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+          sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+          sudo apt-get update && sudo apt-get install nomad
+          nomad version
+      - name: Build docker image
+        working-directory: los
+        run: |
+          docker login -u yuuuka111 -p ${{secrets.DOCKER_HUB_PW}}
+          docker build . --file Dockerfile --tag yuuuka111/fikryfahrezy-los:latest
+          docker push yuuuka111/fikryfahrezy-los:latest
+      # - name: Deploy to nomad
+      #   working-directory: los
+      #   run: |
+      #     curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+      #     sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+      #     sudo apt-get update && sudo apt-get install nomad
+      #     NOMAD_ADDR=${{secrets.NOMAD_ADDR}} nomad job run deploy.nomad
