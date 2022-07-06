@@ -1,4 +1,4 @@
-name: CI/CD for los service
+name: CI for algorithm package
 
 on:
   push:
