@@ -53,3 +53,108 @@ Based on 4 stories on _the website_
 ### ERD
 
 ![ERD](./los-inmem/docs/erd.png)
+
+## Usage
+
+Clone the repository first
+
+```bash
+# using https
+git clone https://github.com/fikryfahrezy/adea.git
+
+# using GitHub Client
+gh repo clone fikryfahrezy/adea
+```
+
+Change directory to project
+
+```bash
+cd adea
+```
+
+### In-Memory Database
+
+```bash
+cd los-inmem
+```
+
+Run with docker-compose (Recommended way)
+
+```bash
+docker-compose up # docker-compose up -d to run in on the background
+```
+
+Run manual (Go required)
+
+```bash
+# install dependencies first
+go mod tidy
+
+# run the program
+go run main.go
+
+# or
+
+# build the program first
+go build -o main
+
+# run the program
+./main
+```
+
+Test it
+
+```bash
+curl http://localhost:4000 # or open it from brower
+```
+
+### Postgre (Cockroach) Database
+
+```bash
+cd los-postgre
+```
+
+Copy `.env.example` to `.env` then fill required env first
+
+```sh
+DATABASE_URL=<some-value>
+```
+
+Run with docker-compose (Recommended way)
+
+```bash
+docker-compose up # docker-compose up -d to run in on the background
+```
+
+Run manual (Go required)
+
+```bash
+# install dependencies first
+go mod tidy
+
+# export (for Linux, do some equivalent command in other os)
+# every env key and value in .env first
+# change the value if desire
+# doing this could be interfering with Auth app
+
+# run the program
+go run main.go
+
+# or
+
+# build the program first
+go build -o main
+
+# run the program
+./main
+```
+
+Test it
+
+```bash
+curl http://localhost:4000 # or open it from brower
+```
+
+## Demo
+
+_Coming Soon_

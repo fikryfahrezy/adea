@@ -12,7 +12,7 @@ job "fikryfahrezy-los" {
       driver = "docker"
 
       config {
-        image = "yuuuka111/fikryfahrezy-los"
+        image = "yuuuka111/fikryfahrezy-los-inmem"
 
         ports = ["http"]
       }

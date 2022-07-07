@@ -1,7 +1,7 @@
 version: "3.9"
 services:
   web:
-    container_name: fikryfahrezy-los
+    container_name: fikryfahrezy-los-inmem
     build: .
     ports:
       - "4000:4000"
