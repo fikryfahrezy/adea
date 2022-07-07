@@ -18,7 +18,7 @@ func main() {
 	authRepo := auth.NewRepository(dbJson)
 	loanRepo := loan.NewRepository(dbJson)
 
-	setting := setting.NewSetting(dbJson)
+	setting := setting.NewSetting(file, dbJson)
 	authApp := auth.NewApp(authRepo)
 	loanApp := loan.NewApp(file.Save, loanRepo)
 

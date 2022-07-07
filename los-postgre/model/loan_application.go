@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 type LoanApplication struct {
 	IsPrivateField               bool
@@ -16,14 +19,14 @@ type LoanApplication struct {
 	BusinessOutcomePerMonthInIdr int64
 	Id                           string
 	UserId                       string
-	OfficerId                    string
 	FullName                     string
 	BirthDate                    string
 	FullAddress                  string
 	Phone                        string
 	IdCardUrl                    string
-	OtherBussiness               string
+	OtherBusiness                string
 	Status                       string
+	OfficerId                    sql.NullString
 	CreatedDate                  time.Time
 	UpdatedDate                  time.Time
 }

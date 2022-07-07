@@ -33,11 +33,11 @@ func (a *LoanApp) CreateLoanPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	in := CreateLoanIn{
-		FullName:       r.FormValue("full_name"),
-		BirthDate:      r.FormValue("birth_date"),
-		FullAddress:    r.FormValue("full_address"),
-		Phone:          r.FormValue("phone"),
-		OtherBussiness: r.FormValue("other_business"),
+		FullName:      r.FormValue("full_name"),
+		BirthDate:     r.FormValue("birth_date"),
+		FullAddress:   r.FormValue("full_address"),
+		Phone:         r.FormValue("phone"),
+		OtherBusiness: r.FormValue("other_business"),
 	}
 
 	in.IsPrivateField, _ = strconv.ParseBool(r.FormValue("is_private_field"))
@@ -81,11 +81,11 @@ func (a *LoanApp) UpdateLoanPut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	in := UpdateLoanIn{
-		FullName:       r.FormValue("full_name"),
-		BirthDate:      r.FormValue("birth_date"),
-		FullAddress:    r.FormValue("full_address"),
-		Phone:          r.FormValue("phone"),
-		OtherBussiness: r.FormValue("other_business"),
+		FullName:      r.FormValue("full_name"),
+		BirthDate:     r.FormValue("birth_date"),
+		FullAddress:   r.FormValue("full_address"),
+		Phone:         r.FormValue("phone"),
+		OtherBusiness: r.FormValue("other_business"),
 	}
 
 	in.IsPrivateField, _ = strconv.ParseBool(r.FormValue("is_private_field"))
@@ -151,7 +151,8 @@ func (a *LoanApp) ProceedLoanPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out := a.ProceedLoan(r.Context(), loanId)
+	userId := r.Header.Get("authorization")
+	out := a.ProceedLoan(r.Context(), loanId, userId)
 	out.HttpJSON(w, resp.NewHttpBody(out.Res))
 }
 
@@ -169,6 +170,7 @@ func (a *LoanApp) ApproveLoanPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out := a.ApproveLoan(r.Context(), loanId, in)
+	userId := r.Header.Get("authorization")
+	out := a.ApproveLoan(r.Context(), loanId, userId, in)
 	out.HttpJSON(w, resp.NewHttpBody(out.Res))
 }

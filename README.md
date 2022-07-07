@@ -52,4 +52,4 @@ Based on 4 stories on _the website_
 
 ### ERD
 
-![ERD](./los/docs/erd.png)
+![ERD](./los-inmem/docs/erd.png)

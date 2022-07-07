@@ -6,8 +6,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/fikryfahrezy/adea/los-postgre/data"
+	"github.com/cockroachdb/cockroach-go/v2/crdb/crdbpgx"
 	"github.com/fikryfahrezy/adea/los-postgre/model"
+	"github.com/jackc/pgx/v4"
 )
 
 var (
@@ -16,10 +17,10 @@ var (
 )
 
 type Repository struct {
-	db *data.JsonFile
+	db *pgx.Conn
 }
 
-func NewRepository(db *data.JsonFile) *Repository {
+func NewRepository(db *pgx.Conn) *Repository {
 	return &Repository{
 		db: db,
 	}
@@ -32,9 +33,19 @@ func (r *Repository) InsertUser(ctx context.Context, user model.User) (model.Use
 	user.Id = id
 	user.CreatedDate = t
 
-	r.db.Lock()
-	defer r.db.Unlock()
-	r.db.DbUser[id] = user
+	err := crdbpgx.ExecuteTx(context.Background(), r.db, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO users (id, username, password, is_officer, created_date)
+			VALUES ($1, $2, $3, $4, $5)`,
+			user.Id, user.Username, user.Password, user.IsOfficer, user.CreatedDate,
+		); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return model.User{}, err
+	}
 
 	return user, nil
 }
@@ -42,11 +53,19 @@ func (r *Repository) InsertUser(ctx context.Context, user model.User) (model.Use
 func (r *Repository) GetUserByUsername(ctx context.Context, username string) (model.User, error) {
 	id := hex.EncodeToString([]byte(username))
 
-	r.db.Lock()
-	defer r.db.Unlock()
-	user, ok := r.db.DbUser[id]
-	if !ok {
+	var user model.User
+	err := crdbpgx.ExecuteTx(context.Background(), r.db, pgx.TxOptions{}, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx,
+			`SELECT id, username, password, is_officer, created_date
+			FROM users WHERE id = $1`,
+			id,
+		).Scan(&user.Id, &user.Username, &user.Password, &user.IsOfficer, &user.CreatedDate)
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
 		return model.User{}, ErrUserNotFound
+	}
+	if err != nil {
+		return model.User{}, err
 	}
 
 	return user, nil

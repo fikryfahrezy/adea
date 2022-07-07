@@ -13,6 +13,7 @@ import (
 var (
 	ErrProcessLoanExist  = errors.New("already have processed loan")
 	ErrModifyProcessLoan = errors.New("cannot modify processed loan")
+	ErrUserForbidden     = errors.New("officer only")
 )
 
 type File interface {
@@ -93,7 +94,7 @@ type (
 		BirthDate                    string `json:"birth_date"`
 		FullAddress                  string `json:"full_address"`
 		Phone                        string `json:"phone"`
-		OtherBussiness               string `json:"other_business"`
+		OtherBusiness                string `json:"other_business"`
 		IdCardUrl                    string `json:"id_card_url"`
 		Status                       string `json:"status"`
 	}
@@ -144,7 +145,7 @@ func (a *LoanApp) GetUserLoanDetail(ctx context.Context, loanId, userId string) 
 		BirthDate:                    userLoan.BirthDate,
 		FullAddress:                  userLoan.FullAddress,
 		Phone:                        userLoan.Phone,
-		OtherBussiness:               userLoan.OtherBussiness,
+		OtherBusiness:                userLoan.OtherBusiness,
 		IdCardUrl:                    userLoan.IdCardUrl,
 		Status:                       userLoan.Status,
 	}
@@ -169,7 +170,7 @@ type (
 		BirthDate                    string
 		FullAddress                  string
 		Phone                        string
-		OtherBussiness               string
+		OtherBusiness                string
 		IdCard                       FileHeader
 	}
 	CreateLoanRes struct {
@@ -240,7 +241,7 @@ func (a *LoanApp) CreateLoan(ctx context.Context, userId string, in CreateLoanIn
 		FullAddress:                  in.FullAddress,
 		Phone:                        in.Phone,
 		IdCardUrl:                    fileUrl,
-		OtherBussiness:               in.OtherBussiness,
+		OtherBusiness:                in.OtherBusiness,
 	}
 
 	if newLoan, err = a.repository.InsertLoan(ctx, newLoan); err != nil {
@@ -272,7 +273,7 @@ type (
 		BirthDate                    string
 		FullAddress                  string
 		Phone                        string
-		OtherBussiness               string
+		OtherBusiness                string
 		IdCard                       FileHeader
 	}
 	UpdateLoanRes struct {
@@ -338,13 +339,12 @@ func (a *LoanApp) UpdateLoan(ctx context.Context, loanId string, userId string, 
 	userLoan.LoanApplicationInIdr = in.LoanApplicationInIdr
 	userLoan.BusinessIncomePerMonthInIdr = in.BusinessIncomePerMonthInIdr
 	userLoan.BusinessOutcomePerMonthInIdr = in.BusinessOutcomePerMonthInIdr
-	userLoan.UserId = userId
 	userLoan.FullName = in.FullName
 	userLoan.BirthDate = in.BirthDate
 	userLoan.FullAddress = in.FullAddress
 	userLoan.Phone = in.Phone
 	userLoan.IdCardUrl = fileUrl
-	userLoan.OtherBussiness = in.OtherBussiness
+	userLoan.OtherBusiness = in.OtherBusiness
 
 	if err = a.repository.UpdateLoan(ctx, loanId, userLoan); err != nil {
 		out.Response = resp.NewResponse(http.StatusInternalServerError, "", err)
@@ -465,7 +465,7 @@ type (
 		BirthDate                    string `json:"birth_date"`
 		FullAddress                  string `json:"full_address"`
 		Phone                        string `json:"phone"`
-		OtherBussiness               string `json:"other_business"`
+		OtherBusiness                string `json:"other_business"`
 		IdCardUrl                    string `json:"id_card_url"`
 		Status                       string `json:"status"`
 	}
@@ -506,7 +506,7 @@ func (a *LoanApp) GetLoanDetail(ctx context.Context, loanId string) (out GetLoan
 		BirthDate:                    userLoan.BirthDate,
 		FullAddress:                  userLoan.FullAddress,
 		Phone:                        userLoan.Phone,
-		OtherBussiness:               userLoan.OtherBussiness,
+		OtherBusiness:                userLoan.OtherBusiness,
 		IdCardUrl:                    userLoan.IdCardUrl,
 		Status:                       userLoan.Status,
 	}
@@ -524,8 +524,23 @@ type (
 	}
 )
 
-func (a *LoanApp) ProceedLoan(ctx context.Context, loanId string) (out ProceedLoanOut) {
+func (a *LoanApp) ProceedLoan(ctx context.Context, loanId, userId string) (out ProceedLoanOut) {
 	out.Response = resp.NewResponse(http.StatusOK, "", nil)
+
+	user, err := a.repository.GetUser(ctx, userId)
+	if errors.Is(err, ErrUserNotFound) {
+		out.Response = resp.NewResponse(http.StatusNotFound, "", err)
+		return
+	}
+	if err != nil {
+		out.Response = resp.NewResponse(http.StatusInternalServerError, "", err)
+		return
+	}
+
+	if !user.IsOfficer {
+		out.Response = resp.NewResponse(http.StatusForbidden, "", ErrUserForbidden)
+		return
+	}
 
 	userLoan, err := a.repository.GetLoan(ctx, loanId)
 	if errors.Is(err, ErrUserLoanNotFound) {
@@ -543,6 +558,7 @@ func (a *LoanApp) ProceedLoan(ctx context.Context, loanId string) (out ProceedLo
 	}
 
 	userLoan.Status = Process.String()
+	userLoan.OfficerId.Scan(userId)
 	if err = a.repository.UpdateLoan(ctx, loanId, userLoan); err != nil {
 		out.Response = resp.NewResponse(http.StatusInternalServerError, "", err)
 		return
@@ -568,8 +584,23 @@ type (
 	}
 )
 
-func (a *LoanApp) ApproveLoan(ctx context.Context, loanId string, in ApproveLoanIn) (out ApproveLoanOut) {
+func (a *LoanApp) ApproveLoan(ctx context.Context, loanId, userId string, in ApproveLoanIn) (out ApproveLoanOut) {
 	out.Response = resp.NewResponse(http.StatusOK, "", nil)
+
+	user, err := a.repository.GetUser(ctx, userId)
+	if errors.Is(err, ErrUserNotFound) {
+		out.Response = resp.NewResponse(http.StatusNotFound, "", err)
+		return
+	}
+	if err != nil {
+		out.Response = resp.NewResponse(http.StatusInternalServerError, "", err)
+		return
+	}
+
+	if !user.IsOfficer {
+		out.Response = resp.NewResponse(http.StatusForbidden, "", ErrUserForbidden)
+		return
+	}
 
 	userLoan, err := a.repository.GetLoan(ctx, loanId)
 	if errors.Is(err, ErrUserLoanNotFound) {
@@ -585,6 +616,8 @@ func (a *LoanApp) ApproveLoan(ctx context.Context, loanId string, in ApproveLoan
 		out.Response = resp.NewResponse(http.StatusBadRequest, "", ErrModifyProcessLoan)
 		return
 	}
+
+	userLoan.OfficerId.Scan(userId)
 
 	userLoan.Status = Reject.String()
 	if in.IsApprove {

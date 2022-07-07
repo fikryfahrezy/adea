@@ -13,9 +13,10 @@ type SettingApp struct {
 	db   *data.JsonFile
 }
 
-func NewSetting(db *data.JsonFile) *SettingApp {
+func NewSetting(file file.File, db *data.JsonFile) *SettingApp {
 	return &SettingApp{
-		db: db,
+		file: file,
+		db:   db,
 	}
 }
 

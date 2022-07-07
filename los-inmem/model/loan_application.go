@@ -22,7 +22,7 @@ type LoanApplication struct {
 	FullAddress                  string
 	Phone                        string
 	IdCardUrl                    string
-	OtherBussiness               string
+	OtherBusiness                string
 	Status                       string
 	CreatedDate                  time.Time
 	UpdatedDate                  time.Time

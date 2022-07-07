@@ -2,27 +2,137 @@ package auth_test
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/fikryfahrezy/adea/los-postgre/auth"
-	"github.com/fikryfahrezy/adea/los-postgre/data"
 	"github.com/fikryfahrezy/adea/los-postgre/model"
+	"github.com/jackc/pgx/v4"
+	_ "github.com/lib/pq"
+	"github.com/ory/dockertest"
 	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	dbJson   = data.NewJson("")
-	authRepo = auth.NewRepository(dbJson)
-	authApp  = auth.NewApp(authRepo)
+	dbPg     *pgx.Conn
+	authRepo *auth.Repository
+	authApp  *auth.AuthApp
 )
 
-func clearDb() {
-	dbJson.DbUser = make(map[string]model.User)
+func loadTables(conn *pgx.Conn) error {
+	tx, err := conn.Begin(context.Background())
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback(context.Background())
+
+	f, err := os.ReadFile("../docs/db.sql")
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(context.Background(),
+		string(f),
+	)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func clearDb() error {
+	tx, err := dbPg.Begin(context.Background())
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback(context.Background())
+
+	// This should be in order of which table truncate first before the other
+	queries := []string{
+		`TRUNCATE users CASCADE`,
+	}
+
+	for _, v := range queries {
+		_, err = tx.Exec(context.Background(),
+			v,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func TestMain(m *testing.M) {
+	var err error
+	pool, err := dockertest.NewPool("")
+	if err != nil {
+		log.Fatalf("Could not connect to docker: %s", err)
+	}
+
+	resource, err := pool.RunWithOptions(&dockertest.RunOptions{Repository: "cockroachdb/cockroach", Tag: "v21.2.13", Cmd: []string{"start-single-node", "--insecure"}})
+	if err != nil {
+		log.Fatalf("Could not start resource: %s", err)
+	}
+
+	databaseUrl := fmt.Sprintf("postgresql://root@localhost:%s/defaultdb?sslmode=disable", resource.GetPort("26257/tcp"))
+
+	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
+	pool.MaxWait = 120 * time.Second
+	if err = pool.Retry(func() error {
+		dbConfig, err := pgx.ParseConfig(databaseUrl)
+		if err != nil {
+			return err
+		}
+
+		dbPg, err = pgx.ConnectConfig(context.Background(), dbConfig)
+		if err != nil {
+			return err
+		}
+
+		return dbPg.Ping(context.Background())
+	}); err != nil {
+		log.Fatalf("Could not connect to cockroach container: %s", err)
+	}
+
+	authRepo = auth.NewRepository(dbPg)
+	authApp = auth.NewApp(authRepo)
+
+	loadTables(dbPg)
+
+	code := m.Run()
+
+	// When you're done, kill and remove the container
+	if err = pool.Purge(resource); err != nil {
+		log.Fatalf("Could not purge resource: %s", err)
+	}
+
+	os.Exit(code)
 }
 
 func TestLogin(t *testing.T) {
-	clearDb()
+	err := clearDb()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx := context.Background()
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
@@ -95,7 +205,11 @@ func TestLogin(t *testing.T) {
 }
 
 func TestRegister(t *testing.T) {
-	clearDb()
+	err := clearDb()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	ctx := context.Background()
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)

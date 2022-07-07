@@ -2,30 +2,138 @@ package loan_test
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/fikryfahrezy/adea/los-postgre/auth"
-	"github.com/fikryfahrezy/adea/los-postgre/data"
 	"github.com/fikryfahrezy/adea/los-postgre/loan"
 	"github.com/fikryfahrezy/adea/los-postgre/model"
+	"github.com/jackc/pgx/v4"
+	"github.com/ory/dockertest"
 )
 
 var (
 	uploadFunc = func(filename string, file io.Reader) (string, error) {
 		return "", nil
 	}
-	dbJson   = data.NewJson("")
-	authRepo = auth.NewRepository(dbJson)
-	loanRepo = loan.NewRepository(dbJson)
-	loanApp  = loan.NewApp(uploadFunc, loanRepo)
+	db       *sql.DB
+	dbPg     *pgx.Conn
+	authRepo *auth.Repository
+	loanRepo *loan.Repository
+	loanApp  *loan.LoanApp
 )
 
-func clearDb() {
-	dbJson.DbUser = make(map[string]model.User)
-	dbJson.DbLoan = make(map[string]model.LoanApplication)
+func loadTables(conn *pgx.Conn) error {
+	tx, err := conn.Begin(context.Background())
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback(context.Background())
+
+	f, err := os.ReadFile("../docs/db.sql")
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(context.Background(),
+		string(f),
+	)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func clearDb() error {
+	tx, err := dbPg.Begin(context.Background())
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback(context.Background())
+
+	// This should be in order of which table truncate first before the other
+	queries := []string{
+		`TRUNCATE loan_applications CASCADE`,
+		`TRUNCATE users CASCADE`,
+	}
+
+	for _, v := range queries {
+		_, err = tx.Exec(context.Background(),
+			v,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit(context.Background())
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func TestMain(m *testing.M) {
+	var err error
+	pool, err := dockertest.NewPool("")
+	if err != nil {
+		log.Fatalf("Could not connect to docker: %s", err)
+	}
+
+	resource, err := pool.RunWithOptions(&dockertest.RunOptions{Repository: "cockroachdb/cockroach", Tag: "v21.2.13", Cmd: []string{"start-single-node", "--insecure"}})
+	if err != nil {
+		log.Fatalf("Could not start resource: %s", err)
+	}
+
+	databaseUrl := fmt.Sprintf("postgresql://root@localhost:%s/defaultdb?sslmode=disable", resource.GetPort("26257/tcp"))
+
+	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
+	pool.MaxWait = 120 * time.Second
+	if err = pool.Retry(func() error {
+		dbConfig, err := pgx.ParseConfig(databaseUrl)
+		if err != nil {
+			return err
+		}
+
+		dbPg, err = pgx.ConnectConfig(context.Background(), dbConfig)
+		if err != nil {
+			return err
+		}
+
+		return dbPg.Ping(context.Background())
+	}); err != nil {
+		log.Fatalf("Could not connect to cockroach container: %s", err)
+	}
+
+	authRepo = auth.NewRepository(dbPg)
+	loanRepo = loan.NewRepository(dbPg)
+	loanApp = loan.NewApp(uploadFunc, loanRepo)
+
+	loadTables(dbPg)
+
+	code := m.Run()
+
+	// When you're done, kill and remove the container
+	if err = pool.Purge(resource); err != nil {
+		log.Fatalf("Could not purge resource: %s", err)
+	}
+
+	os.Exit(code)
 }
 
 func TestGetUserLoans(t *testing.T) {
@@ -56,7 +164,7 @@ func TestGetUserLoans(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -97,7 +205,7 @@ func TestGetUserLoansButUserNotFound(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -138,7 +246,7 @@ func TestGetUserLoanDetail(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -186,7 +294,7 @@ func TestGetUserLoanDetailButLoanNotBelongToUser(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -227,7 +335,7 @@ func TestGetUserLoanDetailButUserNotFound(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -299,7 +407,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -325,7 +433,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -351,7 +459,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -377,7 +485,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -403,7 +511,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -429,7 +537,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -455,7 +563,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -481,7 +589,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -507,7 +615,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -533,7 +641,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -559,7 +667,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -585,7 +693,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -611,7 +719,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -637,7 +745,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -663,7 +771,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -689,7 +797,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -715,7 +823,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -741,7 +849,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -767,7 +875,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -793,7 +901,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -819,7 +927,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -845,7 +953,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -871,7 +979,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -897,7 +1005,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -923,7 +1031,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -949,7 +1057,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -975,7 +1083,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000000000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1001,7 +1109,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000xx",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1027,7 +1135,7 @@ func TestCreateNewLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 				},
@@ -1079,7 +1187,7 @@ func TestCreateNewLoanWithExist(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -1104,7 +1212,7 @@ func TestCreateNewLoanWithExist(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCard: loan.FileHeader{
 			Filename: "test.img",
 			File:     f,
@@ -1150,7 +1258,7 @@ func TestCreateNewLoanWithExistProcess(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -1175,7 +1283,7 @@ func TestCreateNewLoanWithExistProcess(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCard: loan.FileHeader{
 			Filename: "test.img",
 			File:     f,
@@ -1221,7 +1329,7 @@ func TestCreateNewLoanWithExistReject(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -1246,7 +1354,7 @@ func TestCreateNewLoanWithExistReject(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCard: loan.FileHeader{
 			Filename: "test.img",
 			File:     f,
@@ -1292,7 +1400,7 @@ func TestCreateNewLoanWithExistApprove(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -1317,7 +1425,7 @@ func TestCreateNewLoanWithExistApprove(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCard: loan.FileHeader{
 			Filename: "test.img",
 			File:     f,
@@ -1356,7 +1464,7 @@ func TestCreateNewLoanButUserNotExist(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCard: loan.FileHeader{
 			Filename: "test.img",
 			File:     f,
@@ -1401,7 +1509,7 @@ func TestUpdateLoan(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -1431,7 +1539,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1457,7 +1565,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1483,7 +1591,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1509,7 +1617,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1535,7 +1643,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1561,7 +1669,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1587,7 +1695,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1613,7 +1721,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1639,7 +1747,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1665,7 +1773,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1691,7 +1799,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1717,7 +1825,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1743,7 +1851,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1769,7 +1877,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1795,7 +1903,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1821,7 +1929,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1847,7 +1955,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1873,7 +1981,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1899,7 +2007,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1925,7 +2033,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1951,7 +2059,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -1977,7 +2085,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -2003,7 +2111,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -2029,7 +2137,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -2055,7 +2163,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -2081,7 +2189,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -2107,7 +2215,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000000000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -2133,7 +2241,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000xx",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 					File:     f,
@@ -2159,7 +2267,7 @@ func TestUpdateLoan(t *testing.T) {
 				BirthDate:                    "2006-01-02",
 				FullAddress:                  "Full Address",
 				Phone:                        "0000000000",
-				OtherBussiness:               "-",
+				OtherBusiness:                "-",
 				IdCard: loan.FileHeader{
 					Filename: "test.img",
 				},
@@ -2204,7 +2312,7 @@ func TestUpdateLoanButUserNotExist(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCardUrl:                    "http://random",
 	}
 	newLoan, _ = loanRepo.InsertLoan(ctx, newLoan)
@@ -2225,7 +2333,7 @@ func TestUpdateLoanButUserNotExist(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCard: loan.FileHeader{
 			Filename: "test.img",
 			File:     f,
@@ -2271,7 +2379,7 @@ func TestUpdateLoanButLoanNotExist(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCard: loan.FileHeader{
 			Filename: "test.img",
 			File:     f,
@@ -2324,7 +2432,7 @@ func TestUpdateLoanButLoanNotBelongToUser(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -2346,7 +2454,7 @@ func TestUpdateLoanButLoanNotBelongToUser(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCard: loan.FileHeader{
 			Filename: "test.img",
 			File:     f,
@@ -2392,11 +2500,12 @@ func TestUpdateLoanWithStatusProcess(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
-	newLoan, _ = loanRepo.InsertLoan(ctx, newLoan)
+
+	newLoan, err = loanRepo.InsertLoan(ctx, newLoan)
 
 	newLoan.Status = loan.Process.String()
 	loanRepo.UpdateLoan(ctx, newLoan.Id, newLoan)
@@ -2417,7 +2526,7 @@ func TestUpdateLoanWithStatusProcess(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCard: loan.FileHeader{
 			Filename: "test.img",
 			File:     f,
@@ -2463,7 +2572,7 @@ func TestUpdateLoanWithStatusReject(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -2488,7 +2597,7 @@ func TestUpdateLoanWithStatusReject(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCard: loan.FileHeader{
 			Filename: "test.img",
 			File:     f,
@@ -2534,7 +2643,7 @@ func TestUpdateLoanWithStatusApprove(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -2559,7 +2668,7 @@ func TestUpdateLoanWithStatusApprove(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		IdCard: loan.FileHeader{
 			Filename: "test.img",
 			File:     f,
@@ -2600,7 +2709,7 @@ func TestDeleteUserLoan(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -2648,7 +2757,7 @@ func TestDeleteUserLoanButLoanNotBelongToUser(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -2689,7 +2798,7 @@ func TestDeleteUserLoanButUserNotFound(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -2748,7 +2857,7 @@ func TestDeleteLoanWithStatusProcess(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -2791,7 +2900,7 @@ func TestDeleteLoanWithStatusReject(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -2834,7 +2943,7 @@ func TestDeleteLoanWithStatusApprove(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -2877,7 +2986,7 @@ func TestGetLoans(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -2918,7 +3027,7 @@ func TestGetLoanDetail(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -2947,6 +3056,13 @@ func TestProceedLoan(t *testing.T) {
 
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -2970,13 +3086,13 @@ func TestProceedLoan(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
 	loanRepo.InsertLoan(ctx, newLoan)
 
-	out := loanApp.ProceedLoan(ctx, newLoan.Id)
+	out := loanApp.ProceedLoan(ctx, newLoan.Id, admin.Id)
 
 	if out.Res.Id != newLoan.Id {
 		t.Fatalf("resulting: %v, expect: %v | err: %v", out.Res.Id, newLoan.Id, out.Error)
@@ -2988,7 +3104,14 @@ func TestProceedUserLoanButLoanNotFound(t *testing.T) {
 
 	ctx := context.Background()
 
-	out := loanApp.ProceedLoan(ctx, "some-random-loan-id")
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
+	out := loanApp.ProceedLoan(ctx, "some-random-loan-id", admin.Id)
 
 	if out.StatusCode != http.StatusNotFound {
 		t.Fatalf("resulting: %d, expect: %d | err: %v", out.StatusCode, http.StatusNotFound, out.Error)
@@ -2999,6 +3122,13 @@ func TestProceedLoanWithStatusProcess(t *testing.T) {
 	clearDb()
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -3022,7 +3152,7 @@ func TestProceedLoanWithStatusProcess(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -3031,7 +3161,7 @@ func TestProceedLoanWithStatusProcess(t *testing.T) {
 	newLoan.Status = loan.Process.String()
 	loanRepo.UpdateLoan(ctx, newLoan.Id, newLoan)
 
-	out := loanApp.ProceedLoan(ctx, newLoan.Id)
+	out := loanApp.ProceedLoan(ctx, newLoan.Id, admin.Id)
 	if out.StatusCode != http.StatusBadRequest {
 		t.Fatalf("resulting: %d, expect: %d | err: %v", out.StatusCode, http.StatusBadRequest, out.Error)
 	}
@@ -3042,6 +3172,13 @@ func TestProceedLoanWithStatusReject(t *testing.T) {
 
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -3065,7 +3202,7 @@ func TestProceedLoanWithStatusReject(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -3074,7 +3211,7 @@ func TestProceedLoanWithStatusReject(t *testing.T) {
 	newLoan.Status = loan.Reject.String()
 	loanRepo.UpdateLoan(ctx, newLoan.Id, newLoan)
 
-	out := loanApp.ProceedLoan(ctx, newLoan.Id)
+	out := loanApp.ProceedLoan(ctx, newLoan.Id, admin.Id)
 	if out.StatusCode != http.StatusBadRequest {
 		t.Fatalf("resulting: %d, expect: %d | err: %v", out.StatusCode, http.StatusBadRequest, out.Error)
 	}
@@ -3085,6 +3222,13 @@ func TestProceedLoanWithStatusApprove(t *testing.T) {
 
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -3108,7 +3252,7 @@ func TestProceedLoanWithStatusApprove(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -3117,7 +3261,7 @@ func TestProceedLoanWithStatusApprove(t *testing.T) {
 	newLoan.Status = loan.Approve.String()
 	loanRepo.UpdateLoan(ctx, newLoan.Id, newLoan)
 
-	out := loanApp.ProceedLoan(ctx, newLoan.Id)
+	out := loanApp.ProceedLoan(ctx, newLoan.Id, admin.Id)
 	if out.StatusCode != http.StatusBadRequest {
 		t.Fatalf("resulting: %d, expect: %d | err: %v", out.StatusCode, http.StatusBadRequest, out.Error)
 	}
@@ -3128,6 +3272,13 @@ func TestApproveLoan(t *testing.T) {
 
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -3151,13 +3302,13 @@ func TestApproveLoan(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
 	loanRepo.InsertLoan(ctx, newLoan)
 
-	out := loanApp.ApproveLoan(ctx, newLoan.Id, loan.ApproveLoanIn{
+	out := loanApp.ApproveLoan(ctx, newLoan.Id, admin.Id, loan.ApproveLoanIn{
 		IsApprove: true,
 	})
 
@@ -3170,7 +3321,15 @@ func TestApproveLoanButLoanNotFound(t *testing.T) {
 	clearDb()
 
 	ctx := context.Background()
-	out := loanApp.ApproveLoan(ctx, "some-random-loan-id", loan.ApproveLoanIn{
+
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
+	out := loanApp.ApproveLoan(ctx, "some-random-loan-id", admin.Id, loan.ApproveLoanIn{
 		IsApprove: true,
 	})
 
@@ -3183,6 +3342,13 @@ func TestApproveLoanWithStatusWait(t *testing.T) {
 	clearDb()
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -3206,7 +3372,7 @@ func TestApproveLoanWithStatusWait(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -3215,7 +3381,7 @@ func TestApproveLoanWithStatusWait(t *testing.T) {
 	newLoan.Status = loan.Wait.String()
 	loanRepo.UpdateLoan(ctx, newLoan.Id, newLoan)
 
-	out := loanApp.ApproveLoan(ctx, newLoan.Id, loan.ApproveLoanIn{
+	out := loanApp.ApproveLoan(ctx, newLoan.Id, admin.Id, loan.ApproveLoanIn{
 		IsApprove: true,
 	})
 	if out.StatusCode != http.StatusBadRequest {
@@ -3228,6 +3394,13 @@ func TestApproveLoanWithStatusReject(t *testing.T) {
 
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -3251,7 +3424,7 @@ func TestApproveLoanWithStatusReject(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -3260,7 +3433,7 @@ func TestApproveLoanWithStatusReject(t *testing.T) {
 	newLoan.Status = loan.Reject.String()
 	loanRepo.UpdateLoan(ctx, newLoan.Id, newLoan)
 
-	out := loanApp.ApproveLoan(ctx, newLoan.Id, loan.ApproveLoanIn{
+	out := loanApp.ApproveLoan(ctx, newLoan.Id, admin.Id, loan.ApproveLoanIn{
 		IsApprove: true,
 	})
 	if out.StatusCode != http.StatusBadRequest {
@@ -3273,6 +3446,13 @@ func TestApproveLoanWithStatusApprove(t *testing.T) {
 
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -3296,7 +3476,7 @@ func TestApproveLoanWithStatusApprove(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -3305,7 +3485,7 @@ func TestApproveLoanWithStatusApprove(t *testing.T) {
 	newLoan.Status = loan.Approve.String()
 	loanRepo.UpdateLoan(ctx, newLoan.Id, newLoan)
 
-	out := loanApp.ApproveLoan(ctx, newLoan.Id, loan.ApproveLoanIn{
+	out := loanApp.ApproveLoan(ctx, newLoan.Id, admin.Id, loan.ApproveLoanIn{
 		IsApprove: true,
 	})
 	if out.StatusCode != http.StatusBadRequest {
@@ -3318,6 +3498,13 @@ func TestRejectLoan(t *testing.T) {
 
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -3341,13 +3528,13 @@ func TestRejectLoan(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
 	loanRepo.InsertLoan(ctx, newLoan)
 
-	out := loanApp.ApproveLoan(ctx, newLoan.Id, loan.ApproveLoanIn{
+	out := loanApp.ApproveLoan(ctx, newLoan.Id, admin.Id, loan.ApproveLoanIn{
 		IsApprove: false,
 	})
 
@@ -3360,7 +3547,15 @@ func TestRejectLoanButLoanNotFound(t *testing.T) {
 	clearDb()
 
 	ctx := context.Background()
-	out := loanApp.ApproveLoan(ctx, "some-random-loan-id", loan.ApproveLoanIn{
+
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
+	out := loanApp.ApproveLoan(ctx, "some-random-loan-id", admin.Id, loan.ApproveLoanIn{
 		IsApprove: false,
 	})
 
@@ -3373,6 +3568,13 @@ func TestRejectLoanWithStatusWait(t *testing.T) {
 	clearDb()
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -3396,7 +3598,7 @@ func TestRejectLoanWithStatusWait(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -3405,7 +3607,7 @@ func TestRejectLoanWithStatusWait(t *testing.T) {
 	newLoan.Status = loan.Wait.String()
 	loanRepo.UpdateLoan(ctx, newLoan.Id, newLoan)
 
-	out := loanApp.ApproveLoan(ctx, newLoan.Id, loan.ApproveLoanIn{
+	out := loanApp.ApproveLoan(ctx, newLoan.Id, admin.Id, loan.ApproveLoanIn{
 		IsApprove: false,
 	})
 	if out.StatusCode != http.StatusBadRequest {
@@ -3418,6 +3620,13 @@ func TestRejectLoanWithStatusReject(t *testing.T) {
 
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -3441,7 +3650,7 @@ func TestRejectLoanWithStatusReject(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -3450,7 +3659,7 @@ func TestRejectLoanWithStatusReject(t *testing.T) {
 	newLoan.Status = loan.Reject.String()
 	loanRepo.UpdateLoan(ctx, newLoan.Id, newLoan)
 
-	out := loanApp.ApproveLoan(ctx, newLoan.Id, loan.ApproveLoanIn{
+	out := loanApp.ApproveLoan(ctx, newLoan.Id, admin.Id, loan.ApproveLoanIn{
 		IsApprove: false,
 	})
 	if out.StatusCode != http.StatusBadRequest {
@@ -3463,6 +3672,13 @@ func TestRejectLoanWithStatusApprove(t *testing.T) {
 
 	ctx := context.Background()
 
+	admin := model.User{
+		Username:  "admin",
+		Password:  "password",
+		IsOfficer: true,
+	}
+	admin, _ = authRepo.InsertUser(ctx, admin)
+
 	user := model.User{
 		Username:  "username",
 		Password:  "password",
@@ -3486,7 +3702,7 @@ func TestRejectLoanWithStatusApprove(t *testing.T) {
 		BirthDate:                    "2006-01-02",
 		FullAddress:                  "Full Address",
 		Phone:                        "0000000000",
-		OtherBussiness:               "-",
+		OtherBusiness:                "-",
 		UserId:                       user.Id,
 		IdCardUrl:                    "http://random",
 	}
@@ -3495,7 +3711,7 @@ func TestRejectLoanWithStatusApprove(t *testing.T) {
 	newLoan.Status = loan.Approve.String()
 	loanRepo.UpdateLoan(ctx, newLoan.Id, newLoan)
 
-	out := loanApp.ApproveLoan(ctx, newLoan.Id, loan.ApproveLoanIn{
+	out := loanApp.ApproveLoan(ctx, newLoan.Id, admin.Id, loan.ApproveLoanIn{
 		IsApprove: false,
 	})
 	if out.StatusCode != http.StatusBadRequest {

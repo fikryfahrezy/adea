@@ -36,8 +36,6 @@ func (h *Handler) ServeRestAPI() {
 
 	mux.Handle("/tmp/", http.StripPrefix("/tmp/", http.FileServer(http.Dir("./tmp"))))
 
-	mux.HandleFunc("/setting/generatejsondb", routeMWCompose(h.GanerateJsonDB, getRoute, h.authRoute(true)))
-	mux.HandleFunc("/setting/loadjsondb", routeMWCompose(h.LoadJsonDB, postRoute, h.authRoute(true)))
 	mux.HandleFunc("/setting/ziptmp", routeMWCompose(h.ZipTmp, getRoute, h.authRoute(true)))
 	mux.HandleFunc("/setting/unziptmp", routeMWCompose(h.LoadZipTmp, postRoute, h.authRoute(true)))
 
