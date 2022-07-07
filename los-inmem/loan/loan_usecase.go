@@ -6,8 +6,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/fikryfahrezy/adea/los/model"
-	"github.com/fikryfahrezy/adea/los/resp"
+	"github.com/fikryfahrezy/adea/los-inmen/model"
+	"github.com/fikryfahrezy/adea/los-inmen/resp"
 )
 
 var (

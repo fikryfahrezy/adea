@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/fikryfahrezy/adea/los/resp"
-	"github.com/fikryfahrezy/adea/los/session"
+	"github.com/fikryfahrezy/adea/los-postgre/resp"
+	"github.com/fikryfahrezy/adea/los-postgre/session"
 )
 
 func (a *AuthApp) RegisterPost(session *session.Session) http.HandlerFunc {

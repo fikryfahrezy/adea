@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/fikryfahrezy/adea/los/resp"
+	"github.com/fikryfahrezy/adea/los-postgre/resp"
 )
 
 func (a *LoanApp) UserLoansGet(w http.ResponseWriter, r *http.Request) {

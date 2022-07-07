@@ -3,9 +3,9 @@ package setting
 import (
 	"net/http"
 
-	"github.com/fikryfahrezy/adea/los/data"
-	"github.com/fikryfahrezy/adea/los/file"
-	"github.com/fikryfahrezy/adea/los/resp"
+	"github.com/fikryfahrezy/adea/los-postgre/data"
+	"github.com/fikryfahrezy/adea/los-postgre/file"
+	"github.com/fikryfahrezy/adea/los-postgre/resp"
 )
 
 type SettingApp struct {

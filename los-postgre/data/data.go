@@ -6,7 +6,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/fikryfahrezy/adea/los/model"
+	"github.com/fikryfahrezy/adea/los-postgre/model"
 )
 
 type JsonFile struct {

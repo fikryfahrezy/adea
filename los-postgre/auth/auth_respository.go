@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/fikryfahrezy/adea/los/data"
-	"github.com/fikryfahrezy/adea/los/model"
+	"github.com/fikryfahrezy/adea/los-postgre/data"
+	"github.com/fikryfahrezy/adea/los-postgre/model"
 )
 
 var (

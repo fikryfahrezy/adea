@@ -1,13 +1,13 @@
 package main
 
 import (
-	"github.com/fikryfahrezy/adea/los/auth"
-	"github.com/fikryfahrezy/adea/los/data"
-	"github.com/fikryfahrezy/adea/los/file"
-	"github.com/fikryfahrezy/adea/los/handler"
-	"github.com/fikryfahrezy/adea/los/loan"
-	"github.com/fikryfahrezy/adea/los/session"
-	"github.com/fikryfahrezy/adea/los/setting"
+	"github.com/fikryfahrezy/adea/los-inmen/auth"
+	"github.com/fikryfahrezy/adea/los-inmen/data"
+	"github.com/fikryfahrezy/adea/los-inmen/file"
+	"github.com/fikryfahrezy/adea/los-inmen/handler"
+	"github.com/fikryfahrezy/adea/los-inmen/loan"
+	"github.com/fikryfahrezy/adea/los-inmen/session"
+	"github.com/fikryfahrezy/adea/los-inmen/setting"
 )
 
 func main() {

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/fikryfahrezy/adea/los/auth"
-	"github.com/fikryfahrezy/adea/los/loan"
-	"github.com/fikryfahrezy/adea/los/session"
-	"github.com/fikryfahrezy/adea/los/setting"
+	"github.com/fikryfahrezy/adea/los-inmen/auth"
+	"github.com/fikryfahrezy/adea/los-inmen/loan"
+	"github.com/fikryfahrezy/adea/los-inmen/session"
+	"github.com/fikryfahrezy/adea/los-inmen/setting"
 )
 
 type Handler struct {

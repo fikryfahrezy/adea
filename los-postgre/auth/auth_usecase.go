@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/fikryfahrezy/adea/los/model"
-	"github.com/fikryfahrezy/adea/los/resp"
+	"github.com/fikryfahrezy/adea/los-postgre/model"
+	"github.com/fikryfahrezy/adea/los-postgre/resp"
 	"golang.org/x/crypto/bcrypt"
 )
 

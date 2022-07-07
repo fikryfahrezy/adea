@@ -7,10 +7,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/fikryfahrezy/adea/los/auth"
-	"github.com/fikryfahrezy/adea/los/data"
-	"github.com/fikryfahrezy/adea/los/loan"
-	"github.com/fikryfahrezy/adea/los/model"
+	"github.com/fikryfahrezy/adea/los-postgre/auth"
+	"github.com/fikryfahrezy/adea/los-postgre/data"
+	"github.com/fikryfahrezy/adea/los-postgre/loan"
+	"github.com/fikryfahrezy/adea/los-postgre/model"
 )
 
 var (

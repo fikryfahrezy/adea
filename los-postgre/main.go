@@ -1,13 +1,13 @@
 package main
 
 import (
-	"github.com/fikryfahrezy/adea/los/auth"
-	"github.com/fikryfahrezy/adea/los/data"
-	"github.com/fikryfahrezy/adea/los/file"
-	"github.com/fikryfahrezy/adea/los/handler"
-	"github.com/fikryfahrezy/adea/los/loan"
-	"github.com/fikryfahrezy/adea/los/session"
-	"github.com/fikryfahrezy/adea/los/setting"
+	"github.com/fikryfahrezy/adea/los-postgre/auth"
+	"github.com/fikryfahrezy/adea/los-postgre/data"
+	"github.com/fikryfahrezy/adea/los-postgre/file"
+	"github.com/fikryfahrezy/adea/los-postgre/handler"
+	"github.com/fikryfahrezy/adea/los-postgre/loan"
+	"github.com/fikryfahrezy/adea/los-postgre/session"
+	"github.com/fikryfahrezy/adea/los-postgre/setting"
 )
 
 func main() {
