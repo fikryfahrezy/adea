@@ -47,3 +47,9 @@ Based on 4 stories on _the website_
 - **Loan Appraisal Compliance**, is where future customer applications is assessed.
 - **Loan Appraisal Approval**, is where future customer application approved.
 - **Customer On-Boarding**, is where the future customers already becomes service or product customers and they get their service or product.
+
+## Implementation
+
+### ERD
+
+![ERD](./los/docs/erd.png)

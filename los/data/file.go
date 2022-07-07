@@ -17,7 +17,8 @@ type JsonFile struct {
 
 func NewJson(path string) *JsonFile {
 	return &JsonFile{
-		path: path,
+		DbUser: make(map[string]model.User),
+		path:   path,
 	}
 }
 
