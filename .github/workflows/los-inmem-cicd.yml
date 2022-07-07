@@ -6,13 +6,13 @@ on:
       - main
     paths:
       - ".github/**"
-      - "los/**"
+      - "los-inmem/**"
   pull_request:
     branches:
       - main
     paths:
       - ".github/**"
-      - "los/**"
+      - "los-inmem/**"
 
 jobs:
   ci:
@@ -21,7 +21,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: los
+        working-directory: los-inmem
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
@@ -49,11 +49,11 @@ jobs:
           sudo apt-get update && sudo apt-get install nomad
           nomad version
       - name: Build docker image
-        working-directory: los
+        working-directory: los-inmem
         run: |
           docker login -u yuuuka111 -p ${{secrets.DOCKER_HUB_PW}}
-          docker build . --file Dockerfile --tag yuuuka111/fikryfahrezy-los:latest
-          docker push yuuuka111/fikryfahrezy-los:latest
+          docker build . --file Dockerfile --tag yuuuka111/fikryfahrezy-los-inmem:latest
+          docker push yuuuka111/fikryfahrezy-los-inmem:latest
       # - name: Deploy to nomad
       #   working-directory: los
       #   run: |
