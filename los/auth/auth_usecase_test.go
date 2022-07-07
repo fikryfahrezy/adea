@@ -17,7 +17,13 @@ var (
 	authApp  = auth.NewApp(authRepo)
 )
 
+func clearDb() {
+	dbJson.DbUser = make(map[string]model.User)
+}
+
 func TestLogin(t *testing.T) {
+	clearDb()
+
 	ctx := context.Background()
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 
@@ -82,13 +88,14 @@ func TestLogin(t *testing.T) {
 			out := authApp.Login(ctx, c.input)
 
 			if out.StatusCode != c.expect {
-				t.Fatalf("resulting: %d, expect: %d", out.StatusCode, c.expect)
+				t.Fatalf("resulting: %d, expect: %d | err: %v", out.StatusCode, c.expect, out.Error)
 			}
 		})
 	}
 }
 
 func TestRegister(t *testing.T) {
+	clearDb()
 	ctx := context.Background()
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
@@ -157,7 +164,7 @@ func TestRegister(t *testing.T) {
 			out := authApp.Register(ctx, c.input)
 
 			if out.StatusCode != c.expect {
-				t.Fatalf("resulting: %d, expect: %d", out.StatusCode, c.expect)
+				t.Fatalf("resulting: %d, expect: %d | err: %v", out.StatusCode, c.expect, out.Error)
 			}
 		})
 	}

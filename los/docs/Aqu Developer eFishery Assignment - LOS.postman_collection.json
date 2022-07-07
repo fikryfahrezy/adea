@@ -1,267 +1,622 @@
 {
-	"info": {
-		"_postman_id": "d390d200-ed62-4717-9322-9f23bbadbce6",
-		"name": "Aqu Developer eFishery Assignment - LOS",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "10486608"
-	},
-	"item": [
-		{
-			"name": "setting",
-			"item": [
-				{
-					"name": "Generate DB",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{HOST}}/setting/generatejsondb",
-							"host": [
-								"{{HOST}}"
-							],
-							"path": [
-								"setting",
-								"generatejsondb"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Load DB",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "dbname",
-									"value": "user",
-									"type": "text"
-								},
-								{
-									"key": "json",
-									"type": "file",
-									"src": "/home/frz/Downloads/[DEV] [LOCAL] U-Homestay.postman_environment.json"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{HOST}}/setting/loadjsondb",
-							"host": [
-								"{{HOST}}"
-							],
-							"path": [
-								"setting",
-								"loadjsondb"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Generate Tmp ZIP",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{HOST}}/setting/ziptmp",
-							"host": [
-								"{{HOST}}"
-							],
-							"path": [
-								"setting",
-								"ziptmp"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Load Zip",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "zip",
-									"type": "file",
-									"src": "/home/frz/Downloads/tmp.zip"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{HOST}}/setting/unziptmp",
-							"host": [
-								"{{HOST}}"
-							],
-							"path": [
-								"setting",
-								"unziptmp"
-							]
-						}
-					},
-					"response": []
-				}
-			],
-			"auth": {
-				"type": "apikey",
-				"apikey": [
-					{
-						"key": "key",
-						"value": "authorization",
-						"type": "string"
-					},
-					{
-						"key": "value",
-						"value": "{{SESSION}}",
-						"type": "string"
-					}
-				]
-			},
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"type": "text/javascript",
-						"exec": [
-							""
-						]
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"type": "text/javascript",
-						"exec": [
-							""
-						]
-					}
-				}
-			]
-		},
-		{
-			"name": "auth",
-			"item": [
-				{
-					"name": "Register",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"const token = pm.response.json()?.data?.id;",
-									"if (token) {",
-									"    pm.environment.set(\"SESSION\", token);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"username\",\n    \"password\": \"password\",\n    \"is_officer\": true\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{HOST}}/auth/register",
-							"host": [
-								"{{HOST}}"
-							],
-							"path": [
-								"auth",
-								"register"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Login",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"const token = pm.response.json()?.data?.id;",
-									"if (token) {",
-									"    pm.environment.set(\"SESSION\", token);",
-									"}"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"username\": \"username\",\n    \"password\": \"password\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{HOST}}/auth/login",
-							"host": [
-								"{{HOST}}"
-							],
-							"path": [
-								"auth",
-								"login"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "loan",
-			"item": [
-				{
-					"name": "Create Loan",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "formdata",
-							"formdata": [
-								{
-									"key": "file",
-									"type": "file",
-									"src": "/home/frz/Downloads/images.jpeg"
-								}
-							]
-						},
-						"url": {
-							"raw": "{{HOST}}/loan/create",
-							"host": [
-								"{{HOST}}"
-							],
-							"path": [
-								"loan",
-								"create"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		}
-	]
+  "info": {
+    "_postman_id": "d390d200-ed62-4717-9322-9f23bbadbce6",
+    "name": "Aqu Developer eFishery Assignment - LOS",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "10486608"
+  },
+  "item": [
+    {
+      "name": "setting",
+      "item": [
+        {
+          "name": "Generate DB",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{HOST}}/setting/generatejsondb",
+              "host": ["{{HOST}}"],
+              "path": ["setting", "generatejsondb"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Load DB",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "dbname",
+                  "value": "user",
+                  "type": "text"
+                },
+                {
+                  "key": "json",
+                  "type": "file",
+                  "src": "/home/frz/Downloads/[DEV] [LOCAL] U-Homestay.postman_environment.json"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{HOST}}/setting/loadjsondb",
+              "host": ["{{HOST}}"],
+              "path": ["setting", "loadjsondb"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Tmp ZIP",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{HOST}}/setting/ziptmp",
+              "host": ["{{HOST}}"],
+              "path": ["setting", "ziptmp"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Load Zip",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "zip",
+                  "type": "file",
+                  "src": "/home/frz/Downloads/tmp.zip"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{HOST}}/setting/unziptmp",
+              "host": ["{{HOST}}"],
+              "path": ["setting", "unziptmp"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "apikey",
+        "apikey": [
+          {
+            "key": "value",
+            "value": "{{SESSION_ADMIN}}",
+            "type": "string"
+          },
+          {
+            "key": "key",
+            "value": "authorization",
+            "type": "string"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [""]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [""]
+          }
+        }
+      ]
+    },
+    {
+      "name": "auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const dataRes = pm.response.json()?.data;",
+                  "const id = dataRes?.id;",
+                  "const isOfficer = dataRes?.is_officer;",
+                  "",
+                  "if (dataRes) {",
+                  "    if (isOfficer) pm.environment.set(\"SESSION_ADMIN\", id);",
+                  "    else pm.environment.set(\"SESSION_USER\", id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"admin\",\n    \"password\": \"password\",\n    \"is_officer\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{HOST}}/auth/register",
+              "host": ["{{HOST}}"],
+              "path": ["auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const dataRes = pm.response.json()?.data;",
+                  "const id = dataRes?.id;",
+                  "const isOfficer = dataRes?.is_officer;",
+                  "",
+                  "if (dataRes) {",
+                  "    if (isOfficer) pm.environment.set(\"SESSION_ADMIN\", id);",
+                  "    else pm.environment.set(\"SESSION_USER\", id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"user\",\n    \"password\": \"password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{HOST}}/auth/login",
+              "host": ["{{HOST}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "loan user",
+      "item": [
+        {
+          "name": "Get All User Loan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{HOST}}/loan/getall",
+              "host": ["{{HOST}}"],
+              "path": ["loan", "getall"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Loan Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{HOST}}/loan/get?id=string",
+              "host": ["{{HOST}}"],
+              "path": ["loan", "get"],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Loan",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "full_name",
+                  "value": "string",
+                  "type": "text"
+                },
+                {
+                  "key": "birth_date",
+                  "value": "2006-01-02",
+                  "type": "text"
+                },
+                {
+                  "key": "full_address",
+                  "value": "string",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "0000000000",
+                  "type": "text"
+                },
+                {
+                  "key": "other_business",
+                  "value": "string?",
+                  "type": "text"
+                },
+                {
+                  "key": "is_private_field",
+                  "value": "true",
+                  "type": "text"
+                },
+                {
+                  "key": "exp_in_year",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "active_field_number",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "sow_seeds_per_cycle",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "needed_fertilizer_per_cycle_in_kg",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "estimated_yield_in_kg",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "estimated_price_of_harvest_per_kg",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "harvest_cycle_in_months",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "loan_application_in_idr",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "business_income_per_month_in_idr",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "business_outcome_per_month_in_idr",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "id_card",
+                  "type": "file",
+                  "src": "/home/frz/Downloads/images.jpeg"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{HOST}}/loan/create",
+              "host": ["{{HOST}}"],
+              "path": ["loan", "create"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Loan",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "full_name",
+                  "value": "string",
+                  "type": "text"
+                },
+                {
+                  "key": "birth_date",
+                  "value": "2006-01-02",
+                  "type": "text"
+                },
+                {
+                  "key": "full_address",
+                  "value": "string",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "0000000000",
+                  "type": "text"
+                },
+                {
+                  "key": "other_business",
+                  "value": "string?",
+                  "type": "text"
+                },
+                {
+                  "key": "is_private_field",
+                  "value": "true",
+                  "type": "text"
+                },
+                {
+                  "key": "exp_in_year",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "active_field_number",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "sow_seeds_per_cycle",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "needed_fertilizer_per_cycle_in_kg",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "estimated_yield_in_kg",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "estimated_price_of_harvest_per_kg",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "harvest_cycle_in_months",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "loan_application_in_idr",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "business_income_per_month_in_idr",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "business_outcome_per_month_in_idr",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "id_card",
+                  "type": "file",
+                  "src": "/home/frz/Downloads/images.jpeg"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{HOST}}/loan/update?id=string",
+              "host": ["{{HOST}}"],
+              "path": ["loan", "update"],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User Loan",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{HOST}}/loan/delete?id=string",
+              "host": ["{{HOST}}"],
+              "path": ["loan", "delete"],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "apikey",
+        "apikey": [
+          {
+            "key": "value",
+            "value": "{{SESSION_USER}}",
+            "type": "string"
+          },
+          {
+            "key": "key",
+            "value": "authorization",
+            "type": "string"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [""]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [""]
+          }
+        }
+      ]
+    },
+    {
+      "name": "loan admin",
+      "item": [
+        {
+          "name": "Get All User Loan by Admin",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{HOST}}/loan/getall/admin",
+              "host": ["{{HOST}}"],
+              "path": ["loan", "getall", "admin"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get  Loan Detail by Admin",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{HOST}}/loan/get/admin?id=string",
+              "host": ["{{HOST}}"],
+              "path": ["loan", "get", "admin"],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Proceed  Loan by Admin",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{HOST}}/loan/proceedloan?id=string",
+              "host": ["{{HOST}}"],
+              "path": ["loan", "proceedloan"],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve  Loan by Admin Copy",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"is_approve\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{HOST}}/loan/approveloan?id=string",
+              "host": ["{{HOST}}"],
+              "path": ["loan", "approveloan"],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "apikey",
+        "apikey": [
+          {
+            "key": "value",
+            "value": "{{SESSION_ADMIN}}",
+            "type": "string"
+          },
+          {
+            "key": "key",
+            "value": "authorization",
+            "type": "string"
+          }
+        ]
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [""]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [""]
+          }
+        }
+      ]
+    }
+  ]
 }

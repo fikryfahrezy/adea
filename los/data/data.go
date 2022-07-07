@@ -12,12 +12,14 @@ import (
 type JsonFile struct {
 	path   string
 	DbUser map[string]model.User
+	DbLoan map[string]model.LoanApplication
 	sync.RWMutex
 }
 
 func NewJson(path string) *JsonFile {
 	return &JsonFile{
 		DbUser: make(map[string]model.User),
+		DbLoan: make(map[string]model.LoanApplication),
 		path:   path,
 	}
 }
@@ -29,6 +31,10 @@ func (f *JsonFile) ScanToMap(r io.Reader, tableName string) error {
 	switch tableName {
 	case "user":
 		if err := json.NewDecoder(r).Decode(&f.DbUser); err != nil {
+			return err
+		}
+	case "loan":
+		if err := json.NewDecoder(r).Decode(&f.DbLoan); err != nil {
 			return err
 		}
 	default:

@@ -29,7 +29,7 @@ func (f File) Save(fileName string, r io.Reader) (string, error) {
 		return "", err
 	}
 
-	return fullPath, nil
+	return strings.Replace(fullPath, ".", "", 1), nil
 }
 
 // Ref: Zip a file in Go

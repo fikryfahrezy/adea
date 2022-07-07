@@ -12,17 +12,17 @@ type LoanApplication struct {
 	EstimatedPriceOfHarvestPerKg int64
 	HarvestCycleInMonths         int64
 	LoanApplicationInIdr         int64
-	OtherBussiness               string
 	BusinessIncomePerMonthInIdr  int64
 	BusinessOutcomePerMonthInIdr int64
 	Id                           string
 	UserId                       string
 	OfficerId                    string
 	FullName                     string
-	BirtDate                     string
+	BirthDate                    string
 	FullAddress                  string
 	Phone                        string
 	IdCardUrl                    string
+	OtherBussiness               string
 	Status                       string
 	CreatedDate                  time.Time
 	UpdatedDate                  time.Time

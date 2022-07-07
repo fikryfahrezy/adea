@@ -44,32 +44,19 @@ func (h *Handler) ServeRestAPI() {
 	mux.HandleFunc("/auth/login", routeMWCompose(h.LoginPost(h.Session), postRoute))
 	mux.HandleFunc("/auth/register", routeMWCompose(h.RegisterPost(h.Session), postRoute))
 
+	mux.HandleFunc("/loan/getall", routeMWCompose(h.UserLoansGet, getRoute, h.authRoute(false)))
+	mux.HandleFunc("/loan/get", routeMWCompose(h.UserLoanDetailGet, getRoute, h.authRoute(false)))
 	mux.HandleFunc("/loan/create", routeMWCompose(h.CreateLoanPost, postRoute, h.authRoute(false)))
+	mux.HandleFunc("/loan/update", routeMWCompose(h.UpdateLoanPut, putRoute, h.authRoute(false)))
+	mux.HandleFunc("/loan/delete", routeMWCompose(h.UserLoanDelete, deleteRoute, h.authRoute(false)))
+
+	mux.HandleFunc("/loan/getall/admin", routeMWCompose(h.LoansGet, getRoute, h.authRoute(true)))
+	mux.HandleFunc("/loan/get/admin", routeMWCompose(h.LoanDetailGet, getRoute, h.authRoute(true)))
+	mux.HandleFunc("/loan/proceedloan", routeMWCompose(h.ProceedLoanPatch, patchRoute, h.authRoute(true)))
+	mux.HandleFunc("/loan/approveloan", routeMWCompose(h.ApproveLoanPatch, patchRoute, h.authRoute(true)))
 
 	fmt.Println("You are ready to rock and roll!")
 	http.ListenAndServe(":4000", mux)
-}
-
-type RouteMiddleware func(next http.HandlerFunc) http.HandlerFunc
-
-func getRoute(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.NotFound(w, r)
-			return
-		}
-		next(w, r)
-	}
-}
-
-func postRoute(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.NotFound(w, r)
-			return
-		}
-		next(w, r)
-	}
 }
 
 func (h *Handler) authRoute(isPrivate bool) func(next http.HandlerFunc) http.HandlerFunc {
@@ -106,6 +93,58 @@ func (h *Handler) authRoute(isPrivate bool) func(next http.HandlerFunc) http.Han
 		}
 	}
 }
+
+func getRoute(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		next(w, r)
+	}
+}
+
+func postRoute(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		next(w, r)
+	}
+}
+
+func putRoute(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			http.NotFound(w, r)
+			return
+		}
+		next(w, r)
+	}
+}
+
+func deleteRoute(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			http.NotFound(w, r)
+			return
+		}
+		next(w, r)
+	}
+}
+
+func patchRoute(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			http.NotFound(w, r)
+			return
+		}
+		next(w, r)
+	}
+}
+
+type RouteMiddleware func(next http.HandlerFunc) http.HandlerFunc
 
 func routeMWCompose(h http.HandlerFunc, mw ...RouteMiddleware) http.HandlerFunc {
 	for i := len(mw) - 1; i >= 0; i-- {

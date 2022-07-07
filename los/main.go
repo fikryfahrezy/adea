@@ -20,9 +20,9 @@ func main() {
 
 	setting := setting.NewSetting(dbJson)
 	authApp := auth.NewApp(authRepo)
-	loan := loan.NewApp(file.Save, loanRepo)
+	loanApp := loan.NewApp(file.Save, loanRepo)
 
-	handler := handler.NewHandler(session, setting, authApp, loan)
+	handler := handler.NewHandler(session, setting, authApp, loanApp)
 
 	handler.ServeRestAPI()
 }
