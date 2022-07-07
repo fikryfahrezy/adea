@@ -1,4 +1,4 @@
-module github.com/fikryfahrezy/adea/los-inmem
+module github.com/fikryfahrezy/adea/los-postgre
 
 go 1.18
 
