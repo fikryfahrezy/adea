@@ -1,4 +1,4 @@
-job "fikryfahrezy-los" {
+job "fikryfahrezy-los-postgre" {
   datacenters = ["dc1"]
 
   group "webserver" {

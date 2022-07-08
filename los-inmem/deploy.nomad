@@ -1,4 +1,4 @@
-job "fikryfahrezy-los" {
+job "fikryfahrezy-los-inmem" {
   datacenters = ["dc1"]
 
   group "webserver" {
