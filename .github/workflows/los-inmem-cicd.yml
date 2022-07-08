@@ -55,7 +55,7 @@ jobs:
           docker build . --file Dockerfile --tag yuuuka111/fikryfahrezy-los-inmem:latest
           docker push yuuuka111/fikryfahrezy-los-inmem:latest
       - name: Deploy to nomad
-        working-directory: los
+        working-directory: los-inmem
         run: |
           curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
           sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
